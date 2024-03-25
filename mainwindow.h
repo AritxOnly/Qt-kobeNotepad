@@ -27,7 +27,7 @@ public:
     bool isFileSave = false;    //文件是否存储标识符
     bool isRunning = false;
 
-    QTimer *timer;  //定时器指针
+    QTimer *timer = nullptr;  //定时器指针
 
 public slots:
     void fileSave();

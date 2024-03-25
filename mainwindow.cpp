@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QTimer>
 #include <QLabel>
+#include <QFontDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -133,6 +134,13 @@ MainWindow::MainWindow(QWidget *parent)
         isFileSet = false;  //重载标记
         isFileSave = false; //重载标记
         ui->textEdit->setText("");  //输入框清零
+    });
+
+    //字体选择
+    connect(ui->actionFont, &QAction::triggered, this, [=]() {
+        bool isSelected = false;
+        QFont font = QFontDialog::getFont(&isSelected, this);
+        ui->textEdit->setFont(font);
     });
 
     //About
