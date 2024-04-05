@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "settingsdialog.h"
 #include <QAction>
 #include <QString>
 #include <QDebug>
@@ -11,6 +12,7 @@
 #include <QTimer>
 #include <QLabel>
 #include <QFontDialog>
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,12 +21,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     /*
-    *   实现字数检测的基础：设置一个定时器事件，每50ms读取一次text数据，通过text.length获得整形数字
-    *   定时器事件要在析构时释放
-    *
+    *   实现字数检测的基础：设置一个键盘输入事件，当textedit改变，通过text.length获得整形数字
     */
-    //执行函数启动定时器
-    setTimer();
 
     //状态栏设定
     QLabel *cntCh = new QLabel(this);
@@ -33,11 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->statusbar->addWidget(rowClm);
     ui->statusbar->setSizeGripEnabled(false);   //不要小点！
 
-    //信号与槽的链接：定时器
-    connect(timer, &QTimer::timeout, this, [=]() {
-        isRunning = timer->isActive();
-        if(!isRunning)
-            setTimer();
+    connect(ui->textEdit, &QTextEdit::textChanged, this, [=]() {
         QString content = ui->textEdit->toPlainText();
         int len = content.length();
 
@@ -53,8 +47,8 @@ MainWindow::MainWindow(QWidget *parent)
         //输出字符统计
         QString tmp = "共";
         cntCh->setText(tmp.append(QString::number(len).append("个字符    ")));
-        // qDebug() << "the last character is:" << content[len];
     });
+
 
     //自动保存
     // QTimer *saveTimer = new QTimer(this);
@@ -143,10 +137,16 @@ MainWindow::MainWindow(QWidget *parent)
         ui->textEdit->setFont(font);
     });
 
+    //设置界面
+    connect(ui->actionSettings, &QAction::triggered, this, [=]() {
+        SettingsDialog settings(this);
+        settings.exec();
+    });
+
     //About
     connect(ui->actionAbout, &QAction::triggered, this, [=]() {
         QMessageBox about(this);
-        about.setText("版本：v1.0-alpha2\n开发者：Aritx Zhou\n功能仍在开发中...");
+        about.setText("版本：v1.0-alpha3\n开发者：Aritx Zhou\n功能仍在开发中...");
         about.setWindowTitle("关于");
         about.exec();
     });
@@ -155,31 +155,49 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    //代码复用
-    if(!isFileSave)
+    delete ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    QString content = ui->textEdit->toPlainText();
+
+    // qDebug() << content.length() << content.isEmpty();
+
+    if(content.isEmpty() && !isFileSet)
     {
-        if(isFileSet)
-        {
-            if(msgSave())
-                fileSave();
-        } else {
-            QString content = ui->textEdit->toPlainText();
-            if(content[0] != '\0' && msgSave())  //编辑框中有文本
-            {
-                fileDir = QFileDialog::getSaveFileName(this,
-                                                       "保存文件",
-                                                       fileDir,
-                                                       tr("文本文档(*.txt)"));
-                fileSave();
-            }
-        }
+        event->accept();
+        // qDebug() << "Close Event Accepted";
+        return;
     }
 
-    //析构，销毁定时器
-    timer->stop();
-    delete timer;
+    if(!isFileSave)
+    {
+        QMessageBox saveMessage;
+        saveMessage.setWindowTitle("警告");
+        saveMessage.setText("更改尚未保存 \n要保存后再退出吗？");
+        saveMessage.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+        saveMessage.setDefaultButton(QMessageBox::Yes);
+        int isYesPressed = saveMessage.exec();
 
-    delete ui;
+        if(isYesPressed == QMessageBox::Yes)
+        {
+            if(isFileSet)
+                fileSave();
+            else {
+                fileDir = QFileDialog::getSaveFileName(this,
+                                                        "保存文件",
+                                                        fileDir,
+                                                        tr("文本文档(*.txt)"));
+                fileSave();
+            }
+            event->accept();
+        } else if(isYesPressed == QMessageBox::No) {
+            event->accept();
+        } else {
+            event->ignore();
+        }
+    }
 }
 
 void MainWindow::fileSave()
@@ -204,16 +222,6 @@ bool MainWindow::msgSave()
         return true;
     else
         return false;
-}
-
-void MainWindow::setTimer()
-{
-    //创建定时器
-    timer = new QTimer(this);
-    //设置定时器间隔
-    timer->setInterval(50);
-    //启动定时器
-    timer->start();
 }
 
 int MainWindow::countRow(const QString content, int& column)

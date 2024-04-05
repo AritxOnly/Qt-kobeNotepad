@@ -62,6 +62,8 @@
      <string>Settings</string>
     </property>
     <addaction name="actionFont"/>
+    <addaction name="separator"/>
+    <addaction name="actionSettings"/>
    </widget>
    <addaction name="menu"/>
    <addaction name="menuSettings"/>
@@ -96,6 +98,11 @@
   <action name="actionFont">
    <property name="text">
     <string>Font</string>
+   </property>
+  </action>
+  <action name="actionSettings">
+   <property name="text">
+    <string>Settings</string>
    </property>
   </action>
  </widget>

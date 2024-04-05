@@ -19,15 +19,13 @@ public:
 
     //Custom functions
     bool msgSave();
-    void setTimer();
     int countRow(const QString, int&);
+    void closeEvent(QCloseEvent* event);
 
     //variables
     bool isFileSet = false; //文件路径设置标识符
     bool isFileSave = false;    //文件是否存储标识符
     bool isRunning = false;
-
-    QTimer *timer = nullptr;  //定时器指针
 
 public slots:
     void fileSave();
