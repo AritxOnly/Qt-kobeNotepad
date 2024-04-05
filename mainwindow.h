@@ -25,7 +25,11 @@ public:
     //variables
     bool isFileSet = false; //文件路径设置标识符
     bool isFileSave = false;    //文件是否存储标识符
-    bool isRunning = false;
+    bool isAutosaveSet = false;
+    bool isFirstTimeOpen = false;   //存储是否刚打开
+    int autosaveTime = 2;
+
+    QTimer *saveTimer = nullptr;
 
 public slots:
     void fileSave();

@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "settingsdialog.h"
+#include "autosavedialog.h"
 #include <QAction>
 #include <QString>
 #include <QDebug>
@@ -13,6 +14,7 @@
 #include <QLabel>
 #include <QFontDialog>
 #include <QCloseEvent>
+#include <QDateTime>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -32,6 +34,13 @@ MainWindow::MainWindow(QWidget *parent)
     ui->statusbar->setSizeGripEnabled(false);   //不要小点！
 
     connect(ui->textEdit, &QTextEdit::textChanged, this, [=]() {
+        // this->setWindowTitle(this->windowTitle().append('*'));
+        if(isFirstTimeOpen)
+        {
+            isFileSave = false;
+            isFirstTimeOpen = false;
+        }
+
         QString content = ui->textEdit->toPlainText();
         int len = content.length();
 
@@ -49,12 +58,14 @@ MainWindow::MainWindow(QWidget *parent)
         cntCh->setText(tmp.append(QString::number(len).append("个字符    ")));
     });
 
-
     //自动保存
-    // QTimer *saveTimer = new QTimer(this);
-    // saveTimer->setInterval(300);
-    // saveTimer->start();
-    // connect(saveTimer, &QTimer::timeout, this, &MainWindow::fileSave);
+    if(isAutosaveSet)
+    {
+        saveTimer = new QTimer(this);
+        saveTimer->setInterval(autosaveTime * 60 * 1000);
+        saveTimer->start();
+        connect(saveTimer, &QTimer::timeout, this, &MainWindow::fileSave);
+    }
 
     //将Text edit设置为central
     setCentralWidget(ui->textEdit);
@@ -67,6 +78,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     //快捷键设置
     ui->actionSave->setShortcut(tr("Ctrl+S"));
+    ui->actionNew->setShortcut(tr("Ctrl+N"));
+    ui->actionAbout->setShortcut(tr("Ctrl+?"));
 
     //Debug输出
     connect(ui->actionDebug_Ouput, &QAction::triggered, this, [=]() {
@@ -76,13 +89,30 @@ MainWindow::MainWindow(QWidget *parent)
 
     //收集路径
     connect(ui->actionOpen_File, &QAction::triggered, this, [=]() {
+        if(!isFileSave && !ui->textEdit->toPlainText().isEmpty())
+        {
+            if(isFileSet)
+                msgSave();
+            else {
+                fileDir = QFileDialog::getSaveFileName(this,
+                                                       "保存文件",
+                                                       fileDir,
+                                                       tr("文本文档(*.txt)"));
+                fileSave();
+            }
+        }
+        //空初始化
+        isFileSave = true;
+
         fileDir = QFileDialog::getOpenFileName(this,
                                                "打开文件",
                                                fileDir,
                                                tr("文本文档(*.txt)"));
         //导入输入框
         QFile file(fileDir);
-        file.open(QIODevice::ReadOnly);
+        bool isFirstTimeOpen = file.open(QIODevice::ReadOnly);
+        if(!isFirstTimeOpen)
+            return;
         QByteArray content = file.readAll();    //接收信息
         ui->textEdit->setText(content);
         file.close();
@@ -127,7 +157,9 @@ MainWindow::MainWindow(QWidget *parent)
         fileDir = "";
         isFileSet = false;  //重载标记
         isFileSave = false; //重载标记
+        isFirstTimeOpen = true;
         ui->textEdit->setText("");  //输入框清零
+        // this->setWindowTitle("牢大记事本");  //标题栏清零
     });
 
     //字体选择
@@ -143,10 +175,41 @@ MainWindow::MainWindow(QWidget *parent)
         settings.exec();
     });
 
+    //自动保存界面
+    connect(ui->actionAutosave, &QAction::triggered, this, [=]() {
+        AutosaveDialog autosaveSetting(this, autosaveTime, isAutosaveSet);
+        int status = autosaveSetting.exec();
+
+        if(status)
+        {
+            isAutosaveSet = autosaveSetting.isBoxChecked;
+            autosaveTime = autosaveSetting.time;
+        } else
+            return;
+
+        qDebug() << "1" << isAutosaveSet << autosaveTime;
+
+        if(isAutosaveSet)
+        {
+            saveTimer = new QTimer(this);
+            saveTimer->setInterval(autosaveTime * 60 * 1000);
+            saveTimer->start();
+            connect(saveTimer, &QTimer::timeout, this, &MainWindow::fileSave);
+        } else {
+            if(saveTimer->isActive())
+            {
+                qDebug() << "Timer deletion";
+                saveTimer->stop();
+                delete saveTimer;
+                saveTimer = nullptr;
+            }
+        }
+    });
+
     //About
     connect(ui->actionAbout, &QAction::triggered, this, [=]() {
         QMessageBox about(this);
-        about.setText("版本：v1.0-alpha3\n开发者：Aritx Zhou\n功能仍在开发中...");
+        about.setText("版本：v1.0-alpha4\n开发者：Aritx Zhou\n功能仍在开发中...");
         about.setWindowTitle("关于");
         about.exec();
     });
@@ -202,6 +265,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::fileSave()
 {
+    if(!isFileSet)
+        return;
+
+    qDebug() << "Saving file" << fileDir << QDateTime::currentDateTime();
+
     //打开文件
     QFile file(fileDir);
     file.open(QIODevice::WriteOnly | QIODevice::Text);
